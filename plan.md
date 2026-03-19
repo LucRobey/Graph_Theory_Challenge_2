@@ -30,7 +30,6 @@ study_interactions.ipynb and follow `Méthodologie.docx` by creating interaction
 ### Anomaly Detection & Alerting Mechanism
 
 * **Define Heuristics** : Combine topological metrics to flag users. For example, a sudden spike in Betweenness Centrality combined with bridging disparate communities could indicate a troll or a raid leader.
-* **Cross-Validation (Optional)** : If text data is available, perform a lightweight sentiment analysis to see if structurally flagged sub-communities correlate with negative sentiment (hate speech/disinformation).
 
 ## Verification Plan
 

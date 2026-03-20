@@ -8,9 +8,9 @@
 
 ## 2. Graph Modeling & Centrality Analysis
 
-- [ ] Community Detection: Implement Louvain or Leiden algorithms
-- [ ] Centrality Metrics: Calculate Betweenness and Eigenvector/PageRank centrality for users
-- [ ] Core-Periphery Structure: Apply models to identify the engagement "backbone"
+- [X] Community Detection: Implement Louvain or Leiden algorithms
+- [X] Centrality Metrics: Calculate Betweenness and Eigenvector/PageRank centrality for users
+- [X] Core-Periphery Structure: Apply models to identify the engagement "backbone"
 
 ## 3. Dynamic Analysis
 
@@ -19,8 +19,7 @@
 
 ## 4. Anomaly Detection & Alerting Mechanism
 
-- [ ] Define Heuristics: Combine metrics to flag anomalous users (e.g., centrality spikes + bridging)
-- [ ] Cross-Validation (Optional): Perform lightweight sentiment analysis
+- [X] Define Heuristics: Combine metrics to flag anomalous users (e.g., centrality spikes + bridging)
 
 ## 5. Verification
 

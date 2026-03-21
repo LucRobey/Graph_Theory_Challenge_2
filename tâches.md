@@ -14,8 +14,8 @@
 
 ## 3. Dynamic Analysis
 
-- [ ] Temporal Tracking: Compute graph metrics dynamically using weekly segmentation
-- [ ] Evolution Metrics: Track week-over-week changes (modularity, new leaders, network density)
+- [X] Temporal Tracking: Compute graph metrics dynamically using weekly segmentation
+- [X] Evolution Metrics: Track week-over-week changes (modularity, new leaders, network density)
 
 ## 4. Anomaly Detection & Alerting Mechanism
 

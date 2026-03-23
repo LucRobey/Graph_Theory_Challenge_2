@@ -420,6 +420,11 @@ def plot_subreddit_metrics(final_dynamic_df, sub_name):
     axes[0][0].tick_params(axis='x', rotation=45)
     axes[0][0].grid(True)
 
+    axes[1][0].plot(sub_data['ISOYearWeek'], sub_data['Num_Edges'], marker='o')
+    axes[1][0].set_title(f'Num Edges in r/{sub_name}')
+    axes[1][0].tick_params(axis='x', rotation=45)
+    axes[1][0].grid(True)
+
     # Density
     axes[0][1].plot(sub_data['ISOYearWeek'], sub_data['Density'], marker='o', color='orange')
     axes[0][1].set_title(f'Density Evolution in r/{sub_name}')

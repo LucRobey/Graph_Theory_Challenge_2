@@ -80,9 +80,9 @@ def measure_grades(node_metrics, dynamic_metrics):
     node_metrics['Total_Anomaly_Score'] = (node_metrics['Grade_Spammer'] + 
                                         node_metrics['Grade_Bridger'] + 
                                         node_metrics['Grade_Peripheral']+
-                                        1.8*node_metrics['Grade_Leader']+
+                                        node_metrics['Grade_Leader']+
                                         node_metrics['Grade_Burstiness']+
-                                        4*node_metrics['Grade_Instability']+
+                                        node_metrics['Grade_Instability']+
                                         node_metrics['Grade_BotRing'])
 
     # Define Threshold (e.g., Top 1%)
@@ -103,25 +103,51 @@ def measure_grades(node_metrics, dynamic_metrics):
 
 
 def detect_dynamic_anomalies(node_metrics , global_threshold , nb_of_flags):
+    
+    # Define the same thresholds as used above for the plot lines
+    thresh_v = {
+        'Grade_Spammer': (0.80, 0.95),
+        'Grade_Bridger': (0.90, 0.98),
+        'Grade_Peripheral': (0.90, 0.98),
+        'Grade_Leader': (0.40, 0.60),
+        'Grade_Burstiness': (0.90, 0.98),
+        'Grade_Instability': (0.05, 0.30),
+        'Grade_BotRing': (0.95, 0.98)
+    }
     # 1. Define distinct thresholds for each behavior 
     # (e.g., 0.90 means they are in the top 10% most suspicious for that specific trait)
-    node_metrics['Is_Spammer']    = (node_metrics['Grade_Spammer'] > 0.80).astype(int)
-    node_metrics['Is_Bridger']    = (node_metrics['Grade_Bridger'] > 0.85).astype(int)
-    node_metrics['Is_Peripheral'] = (node_metrics['Grade_Peripheral'] > 0.85).astype(int)
-    node_metrics['Is_Leader']     = (node_metrics['Grade_Leader'] > 0.4).astype(int)
-    node_metrics['Is_Bursty']     = (node_metrics['Grade_Burstiness'] > 0.80).astype(int)
-    node_metrics['Is_Unstable']   = (node_metrics['Grade_Instability'] > 0.60).astype(int)
-    node_metrics['Is_BotRing']    = (node_metrics['Grade_BotRing'] > 0.95).astype(int)
+    node_metrics['Is_Spammer']    = (node_metrics['Grade_Spammer'] > thresh_v["Grade_Spammer"][0]).astype(int)
+    node_metrics['Is_Bridger']    = (node_metrics['Grade_Bridger'] > thresh_v["Grade_Bridger"][0]).astype(int)
+    node_metrics['Is_Peripheral'] = (node_metrics['Grade_Peripheral'] > thresh_v["Grade_Peripheral"][0]).astype(int)
+    node_metrics['Is_Leader']     = (node_metrics['Grade_Leader'] > thresh_v["Grade_Leader"][0]).astype(int)
+    node_metrics['Is_Bursty']     = (node_metrics['Grade_Burstiness'] > thresh_v["Grade_Burstiness"][0]).astype(int)
+    node_metrics['Is_Unstable']   = (node_metrics['Grade_Instability'] > thresh_v["Grade_Instability"][0]).astype(int)
+    node_metrics['Is_BotRing']    = (node_metrics['Grade_BotRing'] > thresh_v["Grade_BotRing"][0]).astype(int)
+
+    node_metrics['Is_Super_Spammer']    = (node_metrics['Grade_Spammer'] > thresh_v["Grade_Spammer"][1]).astype(int)
+    node_metrics['Is_Super_Bridger']    = (node_metrics['Grade_Bridger'] > thresh_v["Grade_Bridger"][1]).astype(int)
+    node_metrics['Is_Super_Peripheral'] = (node_metrics['Grade_Peripheral'] > thresh_v["Grade_Peripheral"][1]).astype(int)
+    node_metrics['Is_Super_Leader']     = (node_metrics['Grade_Leader'] > thresh_v["Grade_Leader"][1]).astype(int)
+    node_metrics['Is_Super_Bursty']     = (node_metrics['Grade_Burstiness'] > thresh_v["Grade_Burstiness"][1]).astype(int)
+    node_metrics['Is_Super_Unstable']   = (node_metrics['Grade_Instability'] > thresh_v["Grade_Instability"][1]).astype(int)
+    node_metrics['Is_Super_BotRing']    = (node_metrics['Grade_BotRing'] > thresh_v["Grade_BotRing"][1]).astype(int)
 
     # 2. Count how many distinct 'Red Flags' this user raised
     flag_columns = ['Is_Spammer', 'Is_Bridger', 'Is_Peripheral', 'Is_Leader', 
                     'Is_Bursty', 'Is_Unstable', 'Is_BotRing']
     node_metrics['Total_Red_Flags'] = node_metrics[flag_columns].sum(axis=1)
 
+    super_flag_columns = ['Is_Super_Spammer', 'Is_Super_Bridger', 'Is_Super_Peripheral', 'Is_Super_Leader', 
+                    'Is_Super_Bursty', 'Is_Super_Unstable', 'Is_Super_BotRing']
+    node_metrics['Total_Super_Red_Flags'] = node_metrics[super_flag_columns].sum(axis=1)
+
     # 3. Create your Global Decision Rule
     # A user is an anomaly if they triggered multiple behavioral flags, 
     # OR if their continuous global score is exceptionally high.
     def is_anomaly(row):
+        if row['Total_Super_Red_Flags'] >= 1 and row['Total_Red_Flags'] >= 3:
+            return True
+        
         # Rule A: The Multi-Offender (e.g., they are a Spammer AND part of a BotRing)
         if row['Total_Red_Flags'] >= nb_of_flags:
             return True
@@ -138,9 +164,63 @@ def detect_dynamic_anomalies(node_metrics , global_threshold , nb_of_flags):
     anomalous_df = node_metrics[node_metrics['Flagged_Anomaly'] == True]
     anomalous_users = anomalous_df['User'].dropna().unique().tolist()
 
-    print(f"Total anomalous users flagged: {len(anomalous_users)}")
+    # --- Print Statistics ---
+    print("\n" + "="*50)
+    print("        DETECTION SUMMARY STATISTICS        ")
+    print("="*50)
 
+    # 1. Statistics for each Grade
+    grade_cols = [c for c in node_metrics.columns if c.startswith('Grade_')]
+    if grade_cols:
+        print("\n--- Continuous Grade Statistics (0.0 to 1.0) ---")
+        grade_stats = node_metrics[grade_cols].describe().T[['mean', 'std', 'min', '50%', 'max']]
+        grade_stats.columns = ['Mean', 'Std Dev', 'Min', 'Median (50%)', 'Max']
+        print(grade_stats.to_string())
 
+    # 2. Counts for each Flag
+    flag_cols = [c for c in node_metrics.columns if c.startswith('Is_')]
+    if flag_cols:
+        print("\n--- Binary Anomaly Flag Counts ---")
+        flag_counts = node_metrics[flag_cols].sum().astype(int).reset_index()
+        flag_counts.columns = ['Flag Name', 'Number of Users']
+        # Sort by count for readability
+        flag_counts = flag_counts.sort_values(by='Number of Users', ascending=False)
+        print(flag_counts.to_string(index=False))
+
+    print(f"\nTotal unique users in dataset: {len(node_metrics)}")
+    print(f"Total anomalous users flagged: {len(anomalous_users)} ({len(anomalous_users)/len(node_metrics)*100:.2f}%)")
+    print("="*50 + "\n")
+
+    # --- 0. Behavioral Distribution Violins with Thresholds ---
+    grade_cols_plot = ['Grade_Spammer', 'Grade_Bridger', 'Grade_Peripheral', 
+                       'Grade_Leader', 'Grade_Burstiness', 'Grade_Instability', 'Grade_BotRing']
+    
+    
+
+    n_cols = 4
+    n_rows = (len(grade_cols_plot) + n_cols - 1) // n_cols
+    fig_v, axes_v = plt.subplots(n_rows, n_cols, figsize=(20, 5 * n_rows))
+    axes_v = axes_v.flatten()
+
+    for i, col in enumerate(grade_cols_plot):
+        if col in node_metrics.columns:
+            sns.violinplot(data=node_metrics, y=col, ax=axes_v[i], color='lightsteelblue', inner='box')
+            t, st = thresh_v[col]
+            axes_v[i].axhline(t, color='darkorange', linestyle='--', linewidth=2, label=f'Threshold ({t})')
+            axes_v[i].axhline(st, color='crimson', linestyle='-', linewidth=2, label=f'Super ({st})')
+            axes_v[i].set_title(f'{col.replace("Grade_", "")} Distribution', fontsize=14, fontweight='bold')
+            axes_v[i].set_ylim(-0.05, 1.05)
+            axes_v[i].legend(loc='lower right', fontsize=9)
+        else:
+            axes_v[i].set_title(f'{col} (Missing)')
+            
+    # Hide any unused subplots
+    for j in range(i + 1, len(axes_v)):
+        axes_v[j].axis('off')
+    
+    plt.suptitle("Behavioral Thresholds Analysis", fontsize=20, y=1.02, fontweight='bold')
+    plt.tight_layout()
+    plt.show()
 
     # Set an aesthetic style for the plots
     sns.set_theme(style="whitegrid")
@@ -191,20 +271,28 @@ def detect_dynamic_anomalies(node_metrics , global_threshold , nb_of_flags):
     # ==========================================================
     # BONUS: Radar Profile of the #1 Most Anomalous User
     # ==========================================================
-    top_user = top_15.iloc[0]
+    
+    top_100 = node_metrics.nlargest(200, 'Total_Anomaly_Score').copy()
+    top_user = top_100.iloc[0]
+    second_user = top_100.iloc[199]
 
     # Prepare the data
     labels = [col.replace('Grade_', '') for col in grade_columns]
     values = top_user[grade_columns].values.tolist()
+    values_2 = second_user[grade_columns].values.tolist()
 
     # Close the circle mathematically
     values += values[:1]
+    values_2 += values_2[:1]
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
     angles += angles[:1]
 
     fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
     ax.plot(angles, values, color='crimson', linewidth=2, linestyle='solid')
     ax.fill(angles, values, color='crimson', alpha=0.3)
+
+    ax.plot(angles, values_2, color='blue', linewidth=2, linestyle='solid')
+    ax.fill(angles, values_2, color='blue', alpha=0.3)
 
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels, fontsize=11, fontweight='bold')
@@ -214,6 +302,8 @@ def detect_dynamic_anomalies(node_metrics , global_threshold , nb_of_flags):
 
     ax.set_title(f"Behavioral Profile: User {top_user['User']}", size=16, y=1.1, weight='bold')
     plt.show()
+
+    print("Nb of anomalous users : " , len(anomalous_users))
 
     return anomalous_users , node_metrics
 
@@ -321,37 +411,92 @@ def test_graph_improvement(G_original, anomalous_users):
     if pct_edges_removed > (pct_nodes_removed * 3):
         print("💡 INSIGHT: Highly disproportionate edge removal. These were likely spammers/hubs!")
 
-    print("\n=== STRUCTURAL HEALTH ===")
-    # Density
-    print(f"Density Before: {nx.density(G_original):.5f}")
-    print(f"Density After:  {nx.density(G_clean):.5f}")
-    
+    print("\n=== CALCULATING STRUCTURAL HEALTH ===")
     # Assortativity (Degree correlation)
     assort_orig = nx.degree_assortativity_coefficient(G_original)
     assort_clean = nx.degree_assortativity_coefficient(G_clean)
-    print(f"\nAssortativity Before: {assort_orig:.4f}")
-    print(f"Assortativity After:  {assort_clean:.4f}")
-    if assort_clean > assort_orig:
-        print("💡 INSIGHT: Assortativity increased. The network is behaving more like a natural human network.")
-        
+    print(f"Assortativity: Original={assort_orig:.4f}, Cleaned={assort_clean:.4f}")
+    
     # Giant Component Size (using undirected for safety)
     G_orig_undir = G_original.to_undirected()
     G_clean_undir = G_clean.to_undirected()
-    
     gc_orig = max(nx.connected_components(G_orig_undir), key=len)
     gc_clean = max(nx.connected_components(G_clean_undir), key=len)
-    
-    print(f"\nGiant Component Before: {len(gc_orig)} nodes ({(len(gc_orig)/n_orig)*100:.1f}%)")
-    print(f"Giant Component After:  {len(gc_clean)} nodes ({(len(gc_clean)/n_clean)*100:.1f}%)")
+    print(f"Giant Component: Original={len(gc_orig)} nodes, Cleaned={len(gc_clean)} nodes")
     
     # Note: Clustering can take a minute on very large graphs.
-    print("\nCalculating Average Clustering (This may take a moment)...")
+    print("Calculating Average Clustering (This may take a moment)...")
     clust_orig = nx.average_clustering(G_orig_undir)
     clust_clean = nx.average_clustering(G_clean_undir)
+    print(f"Avg Clustering: Original={clust_orig:.4f}, Cleaned={clust_clean:.4f}")
+
+    # --- VISUALIZATION DASHBOARD ---
+    sns.set_theme(style="whitegrid")
+    fig, axes = plt.subplots(2, 3, figsize=(20, 10))
+    axes = axes.flatten()
     
-    print(f"Avg Clustering Before: {clust_orig:.4f}")
-    print(f"Avg Clustering After:  {clust_clean:.4f}")
-    if clust_clean > clust_orig:
-        print("💡 INSIGHT: Clustering increased! Local communities are much tighter and less polluted after removing anomalies.")
-        
+    # 1. Graph Density (Dedicated plot as values are often very small)
+    density_data = {'Graph': ['Original', 'Cleaned'], 'Density': [nx.density(G_original), nx.density(G_clean)]}
+    sns.barplot(data=pd.DataFrame(density_data), x='Graph', y='Density', ax=axes[0], palette='Blues_d')
+    axes[0].set_title('Graph Density', fontsize=12, fontweight='bold')
+    # Use scientific notation if density is very small
+    if max(density_data['Density']) < 0.001:
+        axes[0].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+
+    # 2. Structural Metrics (Assortativity & Clustering)
+    metrics_comp = {
+        'Metric': ['Assortativity', 'Avg Clustering'],
+        'Original': [assort_orig, clust_orig],
+        'Cleaned': [assort_clean, clust_clean]
+    }
+    df_comp = pd.DataFrame(metrics_comp).melt(id_vars='Metric', var_name='Graph', value_name='Value')
+    sns.barplot(data=df_comp, x='Metric', y='Value', hue='Graph', ax=axes[1], palette='coolwarm')
+    axes[1].set_title('Structural Health', fontsize=12, fontweight='bold')
+    axes[1].set_ylim(min(df_comp['Value'])*1.2 if min(df_comp['Value']) < 0 else 0, max(df_comp['Value'])*1.2)
+
+    # 3. Giant Component Persistence
+    gc_comp = {
+        'Metric': ['Giant Component %'],
+        'Original': [(len(gc_orig)/n_orig)*100],
+        'Cleaned': [(len(gc_clean)/n_clean)*100]
+    }
+    df_gc = pd.DataFrame(gc_comp).melt(id_vars='Metric', var_name='Graph', value_name='Value (%)')
+    sns.barplot(data=df_gc, x='Metric', y='Value (%)', hue='Graph', ax=axes[2], palette='viridis')
+    axes[2].set_title('Connectivity Persistence (%)', fontsize=12, fontweight='bold')
+    axes[2].set_ylim(0, 110)
+
+    # 4. Network Size Reduction (Log Scale)
+    size_comp = {
+        'Component': ['Nodes', 'Nodes', 'Edges', 'Edges'],
+        'Graph': ['Original', 'Cleaned', 'Original', 'Cleaned'],
+        'Count': [n_orig, n_clean, e_orig, e_clean]
+    }
+    df_size = pd.DataFrame(size_comp)
+    sns.barplot(data=df_size, x='Component', y='Count', hue='Graph', ax=axes[3], palette='magma')
+    axes[3].set_yscale('log')
+    axes[3].set_title('Network Size (Log Scale)', fontsize=12, fontweight='bold')
+
+    # 5. Removal Discovery Impact (%)
+    impact_data = {
+        'Category': ['Nodes Removed', 'Edges Removed'],
+        'Percentage': [pct_nodes_removed, pct_edges_removed]
+    }
+    df_impact = pd.DataFrame(impact_data)
+    sns.barplot(data=df_impact, x='Category', y='Percentage', ax=axes[4], palette='Reds_r')
+    axes[4].set_title('Removal Impact (%)', fontsize=12, fontweight='bold')
+    axes[4].set_ylabel('% of Original')
+
+    # 6. Disproportionate Removal Indicator
+    axes[5].axis('off')
+    removal_ratio = pct_edges_removed / (pct_nodes_removed + 1e-9)
+    color = 'green' if removal_ratio > 2 else 'orange'
+    axes[5].text(0.5, 0.5, f"Removal Ratio:\n{removal_ratio:.2f}x\n\n" + 
+                 ("HAVE TARGETED HUBS/SPAMMERS" if removal_ratio > 2 else "Uniform User Removal"),
+                 ha='center', va='center', fontsize=14, fontweight='bold', color=color,
+                 bbox=dict(facecolor='white', edgecolor=color, boxstyle='round,pad=1'))
+
+    plt.suptitle("Detailed Network Improvement Analysis", fontsize=18, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    plt.show()
+
     return G_clean

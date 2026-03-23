@@ -5,7 +5,14 @@
 \usepackage{graphicx} 
 \usepackage{amsmath}
 \usepackage{hyperref}
-
+\usepackage{float}
+\usepackage{geometry}
+\geometry{
+ a4paper,
+ left=15mm,
+ top=20mm,
+ right=15mm
+ }
 % Définition de la ligne horizontale
 \newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
 \renewcommand{\thesection}{\arabic{section}}
@@ -56,13 +63,13 @@ Un nettoyage rigoureux a été effectué pour isoler le comportement organique :
     \item \textbf{Bots et Automoderator} : Environ 2 500 interactions provenant de bots automatisés ont été filtrées via une liste noire.
 \end{itemize}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.7\textwidth]{images/deleted_authors_bar.png}
     \caption{Volumes d'auteurs supprimés par subreddit, mettant en évidence les zones de forte instabilité.}
     \label{fig:deleted_authors}
 \end{figure}
-
+\newpage
 \section{Préparation des données}
 \subsection{Construction du graphe d'interaction}
 Le graphe est construit de manière à ce que chaque arête représente une interaction directe (réponse). Si l'utilisateur A commente une publication de B, ou répond à un commentaire de B, une arête dirigée est créée de A vers B. 
@@ -71,7 +78,7 @@ Le graphe est construit de manière à ce que chaque arête représente une inte
 Afin de ne pas traiter toutes les interactions de manière identique, nous avons introduit une pondération basée sur la richesse du contenu échangé. 
 Le poids $w_{i,j}$ d'une arête est calculé linéairement selon la formule suivante : 
 \begin{equation}
-    w = \text{base} + \frac{\text{longueur du contenu}}{100}
+    w = \text{base} + \frac{\text{longueur du contenu}}{1000}
 \end{equation}
 La valeur de \textit{base} est fixée à $2,0$ pour une réponse à une publication et à $1,0$ pour une réponse à un commentaire. Cette pondération permet de valoriser les interactions riches en information tout en distinguant l'importance hiérarchique des réponses.
 
@@ -86,6 +93,15 @@ Pour identifier les piliers de la communauté ainsi que les intermédiaires stra
 \subsection{Décomposition $k$-core (Structure Core-Periphery)}
 Cette technique permet de séparer le "backbone" (noyau dur) des utilisateurs périphériques. Un utilisateur appartient au $k$-core s'il est connecté à au moins $k$ autres utilisateurs du même niveau. Le cœur du réseau représente les interactions les plus stables et les plus denses.
 
+\subsection{Analyse temporelle pour chaque subreddit}
+Nous avons calculer, pour chaque subreddit et chaque semaine certaines métriques qui nous aideront dans la partie suivante à définir des "grades".
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{images/dynamic_subreddits.png}
+    \caption{Exemple d'analyse dynamique d'un subreddit.}
+    \label{fig:grades}
+\end{figure}
+
 \subsection{Analyse comportementale dynamique}
 Nous avons implémenté un système de notation à sept dimensions pour grader le comportement des utilisateurs :
 \begin{enumerate}
@@ -98,15 +114,15 @@ Nous avons implémenté un système de notation à sept dimensions pour grader l
     \item \textbf{Coordinated Bot Ring} (Combinaison de transitivité et coreness).
 \end{enumerate}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.8\textwidth]{images/grades_violin.png}
     \caption{Distribution des grades comportementaux, montrant les queues de distribution correspondant aux anomalies.}
     \label{fig:grades}
 \end{figure}
-
+\newpage
 \section{Détection d'anomalies : Comparaison des approches}
-Une innovation majeure de ce projet réside dans la comparaison entre deux méthodes de détection.
+Nous avons utilisé deux méthodes de détection.
 
 \subsection{Heuristiques Topologiques (Alert Users)}
 Cette approche statique utilise des seuils sur le graphe global pour identifier des profils types :
@@ -117,7 +133,21 @@ Cette approche statique utilise des seuils sur le graphe global pour identifier 
 
 \subsection{Scoring Multi-dimensionnel (Anomalous Users)}
 Cette approche dynamique agrège les sept grades mentionnés précédemment dans un score d'anomalie total. Un système de "Red Flags" (votes) est utilisé : un utilisateur est flaggé s'il cumule plusieurs comportements suspects simultanément. Cette méthode est plus robuste car elle capte des signaux faibles (ex: burstiness) invisibles pour les heuristiques statiques.
+\newline
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/anomaly_panel.png}
+    \caption{Comparaison des différentes grades.}
+    \label{fig:sentiment}
+\end{figure}
 
+Nous pouvons ainsi détecter selon une logique assez simple, basée sur la note globale ou si certaines notes sont anormalement trop élevées.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.45\textwidth]{images/anomalous_behavior.png}
+    \caption{Exemples de profils suspects.}
+    \label{fig:sentiment}
+\end{figure}
 \section{Évaluation de la solution}
 \subsection{Test de robustesse par fragmentation}
 En simulant la suppression des acteurs identifiés comme critiques (Core), le réseau subit une fragmentation majeure avec une chute de \textbf{69,53\%} de la taille de sa composante géante. Cela valide notre identification des piliers structurels.
@@ -128,7 +158,7 @@ Le retrait des utilisateurs identifiés comme anomalies (Scoring Multi-dimension
 \subsection{Validation par Sentiment Analysis}
 L'analyse VADER révèle que les \textit{Anomalous Users} possèdent un sentiment moyen nettement plus négatif que le reste de la population, confirmant la corrélation entre structure de graphe suspecte et contenu toxique.
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.7\textwidth]{images/sentiment.png}
     \caption{Corrélation entre profil d'anomalie graphique et toxicité sémantique.}
@@ -137,5 +167,17 @@ L'analyse VADER révèle que les \textit{Anomalous Users} possèdent un sentimen
 
 \section{Conclusion}
 L'alliance des métriques topologiques classiques et d'un scoring comportemental dynamique permet une surveillance fine du réseau Reddit. Les "Alert Users" identifient les menaces structurelles immédiates, tandis que les "Anomalous Users" révèlent des stratégies de manipulation plus subtiles. Ces résultats offrent une feuille de route pour une modération ciblée et proportionnée, en adéquation avec les principes du DSA.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/anomalous_results.png}
+    \caption{Résultats pour suppression des anomalous users.}
+    \label{fig:sentiment}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/alert_results.png}
+    \caption{Résultats pour suppression des alert users.}
+    \label{fig:sentiment}
+\end{figure}
 
 \end{document}
